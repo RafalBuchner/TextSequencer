@@ -12,110 +12,29 @@
 ###########################################################################################################
 
 from __future__ import division, print_function, unicode_literals
-from GlyphsApp.plugins import *
+import objc
+from GlyphsApp import Glyphs
+from GlyphsApp.plugins import PalettePlugin
 from textSplitter import splitText
-from vanilla import *
-from AppKit import NSRoundRectBezelStyle
-
-
-def BezelButton(posSize, title, callback=None, sizeStyle="small"):
-    button = Button(posSize, title, callback=callback, sizeStyle=sizeStyle)
-    nsObj = button.getNSButton()
-    nsObj.setBezelStyle_(NSRoundRectBezelStyle)
-    return button
 
 
 class TextSequencer(PalettePlugin):
-    padding = (10, 10, 10)
-    btnH = 20
-    txtH = 17
+
+    dialog = objc.IBOutlet()
+    stringInputMain = objc.IBOutlet()
+
+    stringInputStart = objc.IBOutlet()
+    stringInputEnd = objc.IBOutlet()
+
+    stringInputLeft = objc.IBOutlet()
+    stringInputRight = objc.IBOutlet()
 
     def settings(self):
         self.name = "Text Sequencer"
-        # Create Vanilla window and group with controls
-        width = 200
-        height = 221
-        x, y, p = self.padding
-        self.paletteView = Window((width, height))
+        self.loadNib('IBdialog', __file__)
 
-        self.mainGroup = Box("auto")
-        self.mainGroup.mainTitle = TextBox((2, 0, -2, self.btnH), "main sequence")
-        self.mainGroup.stringInputMain = EditText((2, self.btnH, -2, self.btnH))
-
-        self.startGroup = Box("auto")
-        self.endGroup = Box("auto")
-
-        self.startGroup.startTitle = TextBox((0, 0, -0, self.btnH), "start")
-        self.endGroup.endTitle = TextBox((0, 0, -0, self.btnH), "end")
-        self.startGroup.stringInputStart = EditText((2, self.btnH, -2, self.btnH))
-        self.endGroup.stringInputEnd = EditText((2, self.btnH, -2, self.btnH))
-
-        self.startEndInputs = HorizontalStackView(
-            "auto",
-            views=[
-                dict(view=self.startGroup),
-                dict(view=self.endGroup),
-            ],
-            spacing=4,
-            edgeInsets=(0, 0, 0, 0),
-        )
-
-        self.leftGroup = Box("auto")
-        self.rightGroup = Box("auto")
-
-        self.leftGroup.leftTitle = TextBox((0, 0, -0, self.btnH), "left")
-        self.rightGroup.rightTitle = TextBox((0, 0, -0, self.btnH), "right")
-        self.leftGroup.stringInputLeft = EditText((2, self.btnH, -2, self.btnH))
-        self.rightGroup.stringInputRight = EditText((2, self.btnH, -2, self.btnH))
-
-        self.leftRightInputs = HorizontalStackView(
-            "auto",
-            views=[
-                dict(view=self.leftGroup),
-                dict(view=self.rightGroup),
-            ],
-            spacing=4,
-            edgeInsets=(0, 0, 0, 0),
-        )
-
-        self.apply = BezelButton("auto", "Insert", callback=self.insert)
-
-        self.paletteView.group = VerticalStackView(
-            (x, y, width - p, height - p),
-            views=[
-                dict(view=self.mainGroup),
-                dict(view=self.startEndInputs),
-                dict(view=self.leftRightInputs),
-                dict(view=self.apply, height=36),
-            ],
-            spacing=4,
-            edgeInsets=(4, 4, 4, 4),
-        )
-
-        self.dialog = self.paletteView.group.getNSStackView()
-
-        self.setupFocusOrder()
-
-    @objc.python_method
-    def setupFocusOrder(self):
-        self.mainGroup.stringInputMain._nsObject.setNextKeyView_(
-            self.startGroup.stringInputStart._nsObject
-        )
-        self.startGroup.stringInputStart._nsObject.setNextKeyView_(
-            self.endGroup.stringInputEnd._nsObject
-        )
-        self.endGroup.stringInputEnd._nsObject.setNextKeyView_(
-            self.leftGroup.stringInputLeft._nsObject
-        )
-        self.leftGroup.stringInputLeft._nsObject.setNextKeyView_(
-            self.rightGroup.stringInputRight._nsObject
-        )
-        self.rightGroup.stringInputRight._nsObject.setNextKeyView_(self.apply._nsObject)
-        self.apply._nsObject.setNextKeyView_(self.mainGroup.stringInputMain._nsObject)
-
-    @objc.python_method
-    def insert(self, sender):
-        Glyphs.clearLog()
+    @objc.IBAction
+    def insert_(self, sender):
 
         tab = Glyphs.font.currentTab
         if tab is None:
@@ -123,7 +42,7 @@ class TextSequencer(PalettePlugin):
 
         font = Glyphs.font
         cmap = {
-            int("0x" + glyph.unicode, 0): glyph.name
+            glyph.unicodeChar(): glyph.name
             for glyph in font.glyphs
             if glyph.unicode is not None
         }
@@ -144,11 +63,11 @@ class TextSequencer(PalettePlugin):
         assert masterId is not None, "Master Id is None"
 
         tabLayers = [layer for layer in tab.layers]
-        glyphsToInsert = splitText(self.mainGroup.stringInputMain.get(), cmap)
-        glyphsToInsertStart = splitText(self.startGroup.stringInputStart.get(), cmap)
-        glyphsToInsertEnd = splitText(self.endGroup.stringInputEnd.get(), cmap)
-        glyphsToInsertLeft = splitText(self.leftGroup.stringInputLeft.get(), cmap)
-        glyphsToInsertRight = splitText(self.rightGroup.stringInputRight.get(), cmap)
+        glyphsToInsert = splitText(self.stringInputMain.stringValue(), cmap)
+        glyphsToInsertStart = splitText(self.stringInputStart.stringValue(), cmap)
+        glyphsToInsertEnd = splitText(self.stringInputEnd.stringValue(), cmap)
+        glyphsToInsertLeft = splitText(self.stringInputLeft.stringValue(), cmap)
+        glyphsToInsertRight = splitText(self.stringInputRight.stringValue(), cmap)
 
         layersToInsert = []
 
@@ -196,8 +115,8 @@ class TextSequencer(PalettePlugin):
             after_selection = []
         else:
             before_selection = tabLayers[: tab.textCursor]
-            selection = tabLayers[tab.textCursor : tab.textCursor + tab.textRange]
-            after_selection = tabLayers[tab.textCursor + tab.textRange :]
+            selection = tabLayers[tab.textCursor: tab.textCursor + tab.textRange]
+            after_selection = tabLayers[tab.textCursor + tab.textRange:]
 
         newTabLayers = before_selection
         newTabLayers += layersToInsertStart
@@ -210,10 +129,10 @@ class TextSequencer(PalettePlugin):
         newTabLayers += after_selection
         print("")
         print("***")
-        for l in newTabLayers:
-            if l.parent.name is None:
+        for layer in newTabLayers:
+            if layer.parent.name is None:
                 continue
-            print("/" + l.parent.name, end=" ")
+            print("/" + layer.parent.name, end=" ")
         print()
         tab.layers = newTabLayers
         if tab.textRange != 0:
